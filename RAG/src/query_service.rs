@@ -90,6 +90,7 @@ impl QueryService {
                 citations.push(Citation {
                     document: doc.filename.clone(),
                     text_excerpt: excerpt,
+                    confidence_score: 0.8, // Default confidence score
                 });
             }
         }

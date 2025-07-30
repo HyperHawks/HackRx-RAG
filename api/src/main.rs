@@ -1,15 +1,19 @@
+mod rag_utils;
+
 use axum::{
     routing::post,
     http::StatusCode,
     Json, Router,
 };
 use serde::{Deserialize, Serialize};
-// use srijan_lib
+use std::sync::OnceLock;
+use rag_utils::RagSystem;
+
+static RAG_SYSTEM: OnceLock<RagSystem> = OnceLock::new();
 
 #[derive(Deserialize, Serialize)]
 pub struct QueryPayload {
     pub query: String,
-//     file path
 }
 
 #[derive(Deserialize, Serialize)]
@@ -21,19 +25,23 @@ pub struct RagResponse {
 async fn process_rag_query(payload: QueryPayload) -> Result<RagResponse, String> {
     println!("Received query for RAG: {}", payload.query);
 
-    // srijan_lib.chunk();
+    let rag_system = RAG_SYSTEM.get().ok_or("RAG system not initialized")?;
+    
+    match rag_system.query(&payload.query, None).await {
+        Ok(query_response) => {
+            let context_snippets = query_response
+                .citations
+                .iter()
+                .map(|citation| format!("{}: {}", citation.document, citation.text_excerpt))
+                .collect();
 
-    let dummy_context = vec![
-        format!("Information related to '{}' from Document A", payload.query),
-        "Another relevant snippet from Document B.".to_string(),
-    ];
-
-    let dummy_answer = format!("Based on my knowledge base, the answer to your question about '{}' is: Rust is a systems programming language focused on safety, performance, and concurrency.", payload.query);
-
-    Ok(RagResponse {
-        answer: dummy_answer,
-        context_snippets: dummy_context,
-    })
+            Ok(RagResponse {
+                answer: query_response.response,
+                context_snippets,
+            })
+        },
+        Err(e) => Err(format!("RAG query failed: {}", e)),
+    }
 }
 
 async fn handle_query(
@@ -47,6 +55,22 @@ async fn handle_query(
 
 #[tokio::main]
 async fn main() {
+    // Initialize environment variables and logging
+    dotenv::dotenv().ok();
+    env_logger::init();
+
+    // Initialize RAG system
+    match RagSystem::new("../RAG").await {
+        Ok(rag_system) => {
+            RAG_SYSTEM.set(rag_system).unwrap();
+            println!("RAG system initialized successfully");
+        },
+        Err(e) => {
+            eprintln!("Failed to initialize RAG system: {}", e);
+            std::process::exit(1);
+        }
+    }
+
     let app = Router::new()
         .route("/query", post(handle_query));
 
