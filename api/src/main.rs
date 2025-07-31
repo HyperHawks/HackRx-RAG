@@ -1,10 +1,11 @@
 mod rag_utils;
 mod utils;
+mod query_payload;
+mod rag_response;
 
 use axum::{
     routing::post,
-    http::StatusCode,
-    Json, Router,
+    Router,
 };
 use serde::{Deserialize, Serialize};
 use std::sync::OnceLock;
@@ -12,47 +13,8 @@ use rag_utils::RagSystem;
 
 static RAG_SYSTEM: OnceLock<RagSystem> = OnceLock::new();
 
-#[derive(Deserialize, Serialize)]
-pub struct QueryPayload {
-    pub query: String,
-}
-
-#[derive(Deserialize, Serialize)]
-pub struct RagResponse {
-    pub answer: String,
-    pub context_snippets: Vec<String>,
-}
-
-async fn process_rag_query(payload: QueryPayload) -> Result<RagResponse, String> {
-    println!("Received query for RAG: {}", payload.query);
-
-    let rag_system = RAG_SYSTEM.get().ok_or("RAG system not initialized")?;
-    
-    match rag_system.query(&payload.query, None).await {
-        Ok(query_response) => {
-            let context_snippets = query_response
-                .citations
-                .iter()
-                .map(|citation| format!("{}: {}", citation.document, citation.text_excerpt))
-                .collect();
-
-            Ok(RagResponse {
-                answer: query_response.response,
-                context_snippets,
-            })
-        },
-        Err(e) => Err(format!("RAG query failed: {}", e)),
-    }
-}
-
-async fn handle_query(
-    Json(payload): Json<QueryPayload>,
-) -> Result<Json<RagResponse>, (StatusCode, String)> {
-    match process_rag_query(payload).await {
-        Ok(response) => Ok(Json(response)),
-        Err(e) => Err((StatusCode::INTERNAL_SERVER_ERROR, e)),
-    }
-}
+use tokio::io::AsyncWriteExt;
+use crate::utils::handle_query_with_pdf_url;
 
 #[tokio::main]
 async fn main() {
@@ -73,7 +35,7 @@ async fn main() {
     }
 
     let app = Router::new()
-        .route("/query", post(handle_query));
+        .route("/query", post(handle_query_with_pdf_url));
 
     let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
     println!("Listening on {}", listener.local_addr().unwrap());
