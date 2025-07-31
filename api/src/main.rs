@@ -1,43 +1,43 @@
-mod rag_utils;
+mod hackrx_request;
+mod hackrx_response;
 mod utils;
-mod query_payload;
-mod rag_response;
 
-use axum::{
-    routing::post,
-    Router,
+use axum::{extract::State, routing::post, Json, Router};
+use std::sync::Arc;
+use tokio::sync::RwLock;
+
+use rag_system::{models::Document, RagLibrary};
+
+use crate::{
+    hackrx_request::HackRxRequest,
+    hackrx_response::HackRxResponse,
+    utils::handle_hackrx_run,
 };
-use serde::{Deserialize, Serialize};
-use std::sync::OnceLock;
-use rag_utils::RagSystem;
 
-static RAG_SYSTEM: OnceLock<RagSystem> = OnceLock::new();
-
-use tokio::io::AsyncWriteExt;
-use crate::utils::handle_query_with_pdf_url;
+pub struct AppState {
+    pub rag_library: Arc<RagLibrary>,
+    pub documents: Arc<RwLock<Vec<Document>>>,
+}
 
 #[tokio::main]
 async fn main() {
-    // Initialize environment variables and logging
     dotenv::dotenv().ok();
     env_logger::init();
 
-    // Initialize RAG system
-    match RagSystem::new("../RAG").await {
-        Ok(rag_system) => {
-            RAG_SYSTEM.set(rag_system).unwrap();
-            println!("RAG system initialized successfully");
-        },
-        Err(e) => {
-            eprintln!("Failed to initialize RAG system: {}", e);
-            std::process::exit(1);
-        }
-    }
+    let (documents, rag_library) = RagLibrary::new().await.unwrap();
+
+    let state = Arc::new(AppState {
+        rag_library: Arc::new(rag_library),
+        documents: Arc::new(RwLock::new(documents)),
+    });
 
     let app = Router::new()
-        .route("/query", post(handle_query_with_pdf_url));
+        .route("/hackrx/run", post(handle_hackrx_run))
+        .with_state(state);
 
-    let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
+    let listener = tokio::net::TcpListener::bind("0.0.0.0:8000")
+        .await
+        .unwrap();
     println!("Listening on {}", listener.local_addr().unwrap());
     axum::serve(listener, app).await.unwrap();
 }
