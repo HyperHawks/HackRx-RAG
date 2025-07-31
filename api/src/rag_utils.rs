@@ -455,7 +455,9 @@ impl RagSystem {
             r#"You are an expert assistant that answers questions based solely on the provided context documents. 
 
 INSTRUCTIONS:
-1. Answer the question using ONLY the information from the provided context
+0. If the user asks general questions, politely answer if answerable, otherwise say you can only answer based on the provided context
+1. If the question is related to policies, Answer the question using the information from the provided context
+2. If you can't answer policies questions, say something like "I don't have enough information to answer that question"
 2. Be concise but comprehensive
 3. If you quote or reference specific information, indicate which document it came from
 4. If the context doesn't contain enough information to answer the question, say so clearly
@@ -467,7 +469,7 @@ CONTEXT DOCUMENTS:
 
 QUESTION: {query}
 
-ANSWER (be specific and cite sources):"#
+ANSWER :"#
         )
     }
 

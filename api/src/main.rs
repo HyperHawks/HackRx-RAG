@@ -1,4 +1,5 @@
 mod rag_utils;
+mod utils;
 
 use axum::{
     routing::post,
