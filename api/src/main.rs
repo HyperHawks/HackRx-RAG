@@ -2,7 +2,7 @@ mod hackrx_request;
 mod hackrx_response;
 mod utils;
 
-use axum::{extract::State, routing::post, Json, Router};
+use axum::{extract::State, routing::{get, post}, Json, Router};
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
@@ -13,6 +13,11 @@ use crate::{
     hackrx_response::HackRxResponse,
     utils::handle_hackrx_run,
 };
+
+// Health check handler
+async fn health() -> &'static str {
+    "OK"
+}
 
 pub struct AppState {
     pub rag_library: Arc<RagLibrary>,
@@ -32,6 +37,7 @@ async fn main() {
     });
 
     let app = Router::new()
+        .route("/health", get(health))
         .route("/hackrx/run", post(handle_hackrx_run))
         .with_state(state);
 

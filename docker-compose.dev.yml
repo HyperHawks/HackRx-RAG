@@ -1,0 +1,23 @@
+version: '3.8'
+
+services:
+  hackrx-rag-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: builder  # Stop at builder stage for development
+    ports:
+      - "8000:8000"
+    environment:
+      - RUST_LOG=debug
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+    volumes:
+      # Mount source code for development
+      - ./api:/usr/src/app/api:ro
+      - ./RAG:/usr/src/app/RAG:ro
+      - ./Cargo.toml:/usr/src/app/Cargo.toml:ro
+      - ./Cargo.lock:/usr/src/app/Cargo.lock:ro
+    working_dir: /usr/src/app
+    command: ["cargo", "run", "--bin", "api"]
+    restart: unless-stopped
