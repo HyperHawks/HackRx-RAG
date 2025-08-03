@@ -1,12 +1,16 @@
 use crate::query_payload::QueryPayload;
 use crate::rag_response::RagResponse;
+use crate::hackrx_request::HackRxRequest;
+use crate::hackrx_response::HackRxResponse;
+use crate::AppState;
 
 use std::process::Command;
 use std::io::{self, ErrorKind, Read};
-use axum::http::StatusCode;
+use axum::{extract::State, http::StatusCode};
 use axum::Json;
 use tokio::io::AsyncWriteExt;
 use tempfile::NamedTempFile;
+use std::sync::Arc;
 
 use unicode_segmentation::UnicodeSegmentation;
 use tiktoken_rs::{cl100k_base, CoreBPE};
@@ -257,4 +261,32 @@ pub async fn process_rag_query(user_query: String, file_context: String) -> Resu
         answer: dummy_answer,
         context_snippets: response_context_snippets,
     })
+}
+
+// Handler for the /hackrx/run endpoint
+pub async fn handle_hackrx_run(
+    State(state): State<Arc<AppState>>,
+    Json(payload): Json<HackRxRequest>,
+) -> Result<Json<HackRxResponse>, (StatusCode, String)> {
+    log::info!("Received HackRx request with {} questions", payload.questions.len());
+    
+    let mut answers = Vec::new();
+    
+    // Process each question
+    for question in payload.questions {
+        log::info!("Processing question: {}", question);
+        
+        // Use the existing RAG system to get answers
+        match process_rag_query(question.clone(), payload.documents.clone()).await {
+            Ok(rag_response) => {
+                answers.push(rag_response.answer);
+            }
+            Err(e) => {
+                log::error!("Error processing question '{}': {}", question, e);
+                answers.push(format!("Error processing question: {}", e));
+            }
+        }
+    }
+    
+    Ok(Json(HackRxResponse { answers }))
 }

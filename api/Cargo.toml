@@ -20,3 +20,7 @@ unicode-segmentation = "1.10"
 tempfile = "0.3.0"
 tiktoken-rs = "0.5.0"
 rag_system = { path = "../RAG" }
+tower = "0.4"
+tower-http = { version = "0.5", features = ["cors"] }
+axum-extra = { version = "0.9", features = ["typed-header"] }
+headers = "0.4"
